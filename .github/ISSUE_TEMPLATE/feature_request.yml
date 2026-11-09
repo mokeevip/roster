@@ -1,0 +1,23 @@
+name: 功能建议
+description: 提出改进建议或新的使用需求
+title: '[Feature] '
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 使用场景
+      description: 希望解决什么问题？目前如何处理？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 期望的功能
+      description: 描述期望的操作方式与结果。
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充说明
+      description: 可提供示意图或使用虚构数据的示例。

@@ -1,5 +1,27 @@
 # 班级花名册
 
+离线使用的班级名单管理与 A4 排版工具，支持网页版和 Windows 便携桌面版，适合整理名单、分组打印和导出 Excel。
+
+## 功能概览
+
+- **多班级管理**：独立维护各班名单、原始顺序与排版设置。
+- **便捷导入**：支持从 Excel 粘贴姓名、性别，或直接导入 Excel 文件。
+- **A4 实时预览**：男女双列、分组双列、一键适配、自动分页与对称页边距。
+- **排版模板**：保存配色、字号、分组和间距，在不同班级间复用。
+- **多格式输出**：打印 / PDF、带样式的 Excel、可恢复的 JSON 项目文件。
+- **离线运行**：运行时无需联网，提供单文件 HTML 和 Windows 便携 EXE。
+
+## 下载与快速开始
+
+前往 [GitHub Releases](https://github.com/mokeevip/roster/releases) 查看已发布版本及附件：
+
+| 版本 | 下载文件 | 使用方式 |
+| --- | --- | --- |
+| 网页版 | `班级花名册-网页版.zip` | 解压后，用新版 Edge 或 Chrome 打开内部 HTML |
+| Windows 桌面版 | `班级花名册.exe` | Windows 10/11 64 位直接运行，无需安装 |
+
+若尚无发布版本或附件，可按下方「源代码构建」自行生成。GitHub 的 **Code → Download ZIP** 下载的是源码；单文件 HTML 与发行包由构建生成，不包含在源码仓库中。
+
 ## 直接使用
 
 双击 **`班级花名册.html`**，用新版 Edge 或 Chrome 打开即可。所有依赖都包含在该文件中，无需安装、联网或启动服务。可以单独复制这个 HTML 到其他电脑。
@@ -29,10 +51,10 @@ Excel 的字体度量和分页与浏览器存在差异；需要固定打印效�
 
 ## 两种发行包
 
-构建环境为 Windows 10/11 x64，建议 Node.js 22 或更新版本。首次安装与打包需联网下载构建依赖，交付给使用者后可以离线运行。
+桌面版打包使用 Windows 10/11 x64，推荐 Node.js 22 LTS（CI 使用此版本）。首次安装与打包需联网下载构建依赖，交付给使用者后可以离线运行。
 
 ```powershell
-npm install
+npm ci
 npm run pack:web
 npm run pack:exe
 # 或一次生成两种包
@@ -52,7 +74,7 @@ npm run pack:all
 ```powershell
 $env:ELECTRON_MIRROR='https://npmmirror.com/mirrors/electron/'
 $env:ELECTRON_BUILDER_BINARIES_MIRROR='https://npmmirror.com/mirrors/electron-builder-binaries/'
-npm install
+npm ci
 npm run pack:all
 ```
 
@@ -60,10 +82,10 @@ npm run pack:all
 
 ## 源代码构建
 
-需要 Node.js 20 或更新版本：
+推荐 Node.js 22 LTS，使用 npm 安装锁定版本的依赖。在项目根目录执行：
 
 ```sh
-npm install
+npm ci
 npm test
 npm run build
 ```
@@ -71,3 +93,55 @@ npm run build
 安装了 Microsoft Edge 的 Windows 电脑还可运行 `npm run test:browser`，检查离线页面、名单导入、对称排版、Excel 往返、本地暂存恢复与 PDF 输出。
 
 构建输出为根目录的 `班级花名册.html`。源代码位于 `src/`。Excel 处理使用 xlsx-js-style，ZIP 处理使用 fflate，打包使用 esbuild；运行时不访问 CDN。依赖许可证保留在构建文件中。
+
+### 常用命令
+
+| 命令 | 用途 |
+| --- | --- |
+| `npm test` | 运行名单、排版、项目与 Excel 数据测试 |
+| `npm run build` | 构建离线单文件 HTML |
+| `npm start` | 构建并启动 Electron 桌面开发版 |
+| `npm run test:browser` | 在安装了 Edge 的 Windows 上运行浏览器验证 |
+| `npm run pack:web` | 生成网页版 ZIP |
+| `npm run pack:exe` | 生成 Windows 便携 EXE |
+| `npm run pack:all` | 生成两种发行包 |
+| `npm run test:desktop` | 验证已打包的 Windows 桌面程序 |
+
+### 目录结构
+
+```text
+src/                  页面、样式、名单模型与 Excel 处理
+desktop/              Electron 桌面入口
+scripts/              网页版打包脚本
+tests/                单元测试、浏览器与桌面验证
+.github/              GitHub CI 与问题反馈模板
+build.mjs             单文件 HTML 构建脚本
+release/              发行包与桌面构建中间产物（构建生成）
+班级花名册.html         离线网页（构建生成）
+```
+
+## 常见问题
+
+**数据保存在哪里？**
+
+网页版自动暂存于当前浏览器；桌面发行版自动保存到 EXE 旁的 `data/`。建议定期使用「保存项目」导出 JSON，作为备份与迁移文件。
+
+**升级桌面版如何保留名单？**
+
+关闭程序，保留原有 `data/` 文件夹并替换 EXE。迁移到其他位置或电脑时，将 EXE 与整个 `data/` 文件夹一起复制。
+
+**为什么换浏览器或移动 HTML 后看不到名单？**
+
+浏览器暂存与浏览器环境和文件路径有关。使用之前保存的 JSON 项目文件恢复；将 HTML 复制给别人不会同时带上已录入名单。
+
+**打印应该用 Excel 还是 PDF？**
+
+需要固定版式时优先使用 PDF；Excel 适合继续处理表格数据，其字体度量与分页可能与浏览器不同。
+
+## 问题反馈与参与开发
+
+欢迎通过 [Issues](https://github.com/mokeevip/roster/issues) 提交问题或功能建议。反馈时请附上运行版本、网页版或桌面版、系统与浏览器信息，以及复现步骤；示例名单和截图请使用虚构数据。
+
+提交代码前请运行 `npm test` 和 `npm run build`。GitHub Actions 会在推送及 Pull Request 时执行依赖安装、单元测试和网页构建。
+
+发布时可运行 `npm run pack:all`，将 `release/班级花名册-网页版.zip` 和 `release/班级花名册.exe` 上传到 GitHub Release 附件，供使用者直接下载。

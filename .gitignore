@@ -5,6 +5,9 @@ node_modules/
 release/
 /班级花名册.html
 
+# Local desktop data
+/data/
+
 # Logs
 *.log
 

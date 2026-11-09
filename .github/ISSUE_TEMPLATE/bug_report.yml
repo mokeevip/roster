@@ -1,0 +1,50 @@
+name: 问题反馈
+description: 报告使用中遇到的问题
+title: '[Bug] '
+body:
+  - type: input
+    id: version
+    attributes:
+      label: 运行版本
+      description: 填写发行版本号；使用源码时可填写提交编号。
+    validations:
+      required: true
+  - type: dropdown
+    id: edition
+    attributes:
+      label: 使用方式
+      options:
+        - 网页版 HTML
+        - Windows 便携 EXE
+        - 源码开发运行
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 系统与浏览器
+      placeholder: 例如 Windows 11，Edge 版本号（桌面版可只填写系统）
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 请说明操作过程；示例名单请使用虚构数据。
+      placeholder: |
+        1. 打开……
+        2. 点击……
+        3. 出现……
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果与实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: attachments
+    attributes:
+      label: 截图与补充信息
+      description: 可附错误信息、截图或使用虚构名单的示例文件。
