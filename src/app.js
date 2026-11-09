@@ -51,22 +51,18 @@ function renderSettings() {
     persist();
   }
   const s = current().settings;
-  Object.keys(defaults).forEach(key => { if ($(key).type === 'checkbox') $(key).checked = s[key]; else $(key).value = s[key]; });
+  Object.keys(defaults).forEach(key => { if ($(key).type === 'checkbox') $(key).checked = s[key]; else $(key).value = key === 'rowHeight' ? Number(s[key].toFixed(2)) : s[key]; });
   $('groupSize').disabled = false;
   $('groupGap').disabled = false;
-  const selected = $('layout-template').value;
-  $('layout-template').innerHTML = '<option value="">请选择模板</option>' + (project.templates || []).map(t => `<option value="${escape(t.id)}">${escape(t.name)}</option>`).join('');
-  $('template-list').innerHTML = (project.templates || []).length ? project.templates.map(t => `<div class="layout-note"><strong>${escape(t.name)}</strong><p>${t.settings.mode === 'group' ? `分组双列 · 每组 ${t.settings.groupSize} 人` : '男女双列 · 男左女右'} · ${t.settings.fontSize} pt · ${t.settings.autoFit ? '自动适配一页' : '手动排版'}</p><div class="paste-actions"><button class="primary" data-template-edit="${escape(t.id)}">编辑</button><button data-template-apply="${escape(t.id)}">套用到当前班级</button></div></div>`).join('') : '<div class="hint">还没有保存的模板。设置好排版后，点击下方“保存为模板”。</div>';
-  $('layout-template').value = selected;
-  $('apply-template').disabled = $('delete-template').disabled = !$('layout-template').value;
+  $('template-list').innerHTML = (project.templates || []).length ? project.templates.map(t => `<div class="layout-note template-card"><button class="template-open" data-template-edit="${escape(t.id)}"><strong>${escape(t.name)}</strong><span>${t.settings.mode === 'group' ? `分组双列 · 每组 ${t.settings.groupSize} 人` : '男女双列 · 男左女右'} · ${t.settings.fontSize} pt</span></button><div class="paste-actions"><button class="primary" data-template-edit="${escape(t.id)}">编辑</button><button class="danger-text" data-template-delete="${escape(t.id)}">删除</button></div></div>`).join('') : '<div class="hint">还没有保存的排版。点击“新建排版”，设置完成后点击“保存排版”。</div>';
   renderTemplateEditor();
   const fitted = layoutSettings(current()), pages = planPages(current());
   $('fit-status').textContent = `当前 ${pages.length} 页 · 实际行高 ${metrics(fitted).row.toFixed(2)} mm。点击“一键适配 A4”调整为单页排版，之后可自由修改；名单变化不会自动重算。`;
   $('geometry').textContent = `左 ${s.margin} mm ＋ 左列 ${metrics(s).columnWidth.toFixed(1)} mm ＋ 中间 ${s.gap} mm ＋ 右列 ${metrics(s).columnWidth.toFixed(1)} mm ＋ 右 ${s.margin} mm ＝ 210 mm`;
 }
 function selectedClasses() { return $('scope').value === 'all' ? project.classes : [current()]; }
-function cell(p, s, index, offset = 0) {
-  return `<div class="student-cell" style="height:${metrics(s).row - 0.6}mm;font-size:${s.fontSize}pt;background:#${cellColor(s, index, offset)}">${s.showNumbers ? `<span class="number">${p.number}.</span>` : ''}<span class="student-name">${escape(p.name)}</span></div>`;
+function cell(p, s, index, offset = 0, groupLength = s.groupSize) {
+  return `<div class="student-cell" style="height:${metrics(s).row - 0.6}mm;font-size:${s.fontSize}pt;background:#${cellColor(s, index, offset, groupLength)}">${s.showNumbers ? `<span class="number">${p.number}.</span>` : ''}<span class="student-name">${escape(p.name)}</span></div>`;
 }
 function renderPreview() {
   let count = 0;
@@ -77,7 +73,7 @@ function renderPreview() {
       let content = '';
       if (!cls.students.length) content = '<div class="paper-empty">添加学生后，这里将显示花名册</div>';
       else if (page.mode === 'gender') content = page.columns.map((list, ci) => `<div class="paper-column"><div class="column-heading" style="height:${metrics(s).heading}mm;margin-bottom:0">${ci ? '女生' : '男生'}</div>${list.map(p => cell(p, s, ci)).join('')}</div>`).join('');
-      else content = page.pairs.map(pair => pair.blocks.map(b => `<div class="group-block" style="height:${pair.height}mm">${b ? `<div class="group-heading" style="height:${metrics(s).heading}mm">第 ${b.index + 1} 组${b.continued ? '（续）' : ''}</div>${b.students.map((p, j) => cell(p, s, b.index, b.offset + j)).join('')}` : ''}</div>`).join('')).join('');
+      else content = page.pairs.map(pair => pair.blocks.map(b => `<div class="group-block" style="height:${pair.height}mm">${b ? `<div class="group-heading" style="height:${metrics(s).heading}mm">第 ${b.index + 1} 组${b.continued ? '（续）' : ''}</div>${b.students.map((p, j) => cell(p, s, b.index, b.offset + j, b.groupLength)).join('')}` : ''}</div>`).join('')).join('');
       return `<div class="page-wrapper"><article class="paper" style="padding:${s.verticalMargin}mm ${s.margin}mm"><div class="paper-title" title="${escape(s.title || cls.name + '花名册')}">${escape(s.title || cls.name + '花名册')}</div><div class="paper-subtitle">${escape(cls.name)} · 共 ${cls.students.length} 人 · 男 ${male} 人 / 女 ${cls.students.length - male} 人${s.mode === 'group' ? ` · 每组 ${s.groupSize} 人` : ''}</div><div class="paper-grid" style="column-gap:${s.gap}mm;row-gap:${s.mode === 'group' ? s.groupGap : 0}mm">${content}</div><div class="paper-footer">${escape(cls.name)} · 第 ${pi + 1} / ${pages.length} 页</div></article></div>`;
     }).join('');
   }).join('');
@@ -179,49 +175,61 @@ $('fit-one-page').onclick = () => {
   update();
   toast(planPages(current()).length === 1 ? '已适配为 A4 单页，可继续手动修改并保存。' : '已优化排版，达到可读字号下限后仍需分页，可继续手动修改。');
 };
-$('reset-layout').onclick = () => { current().settings = { ...defaults }; update(); };
+$('reset-layout').onclick = () => {
+  const template = editingClassId === current().id && project.templates?.find(t => t.id === editingTemplateId);
+  current().settings = template ? cleanSettings(template.settings) : { ...defaults };
+  update();
+  toast(template ? `已恢复「${template.name}」最后保存的配置。` : '已恢复默认排版。');
+};
 $('save-layout').onclick = () => saveTemplate();
 function renderTemplateEditor() {
   const template = project.templates?.find(t => t.id === editingTemplateId);
   if (!template || editingClassId !== current().id) editingTemplateId = '';
   const editing = !!editingTemplateId;
-  $('edit-template').disabled = !$('layout-template').value;
-  $('update-template').disabled = !editing;
-  $('template-edit-status').textContent = editing ? `正在编辑「${template.name}」：修改上方排版参数后，点击“保存模板修改”更新原模板。当前班级同步显示并保存此排版；其他班级已套用的设置不受影响。` : '在“模板列表”中选择已保存的模板，点击“编辑模板”即可重新载入并修改。';
+  $('layout-editor-title').textContent = editing ? `编辑排版：${template.name}` : '新排版';
+  $('template-edit-status').textContent = editing ? `正在编辑「${template.name}」。点击“保存排版”直接更新此排版。当前班级同步预览；其他班级的设置不受影响。` : '设置完成后点击“保存排版”，输入名称即可保存到模板列表。';
 }
-$('layout-template').onchange = () => {
+function newLayout() {
   editingTemplateId = '';
-  $('apply-template').disabled = $('delete-template').disabled = !$('layout-template').value;
-  renderTemplateEditor();
-};
-$('edit-template').onclick = () => {
-  const template = project.templates?.find(t => t.id === $('layout-template').value);
+  editingClassId = '';
+  current().settings = { ...defaults };
+  update();
+  document.querySelector('[data-panel="layout"]').click();
+  $('layout-panel').scrollTop = 0;
+}
+$('new-layout').onclick = $('new-template').onclick = newLayout;
+function editTemplate(id) {
+  const template = project.templates?.find(t => t.id === id);
   if (!template) return;
   editingTemplateId = template.id; editingClassId = current().id;
   current().settings = cleanSettings(template.settings); update();
   document.querySelector('[data-panel="layout"]').click();
   $('layout-panel').scrollTop = 0;
-  toast(`已载入「${template.name}」，修改后点击“保存模板修改”。`);
-};
+  toast(`已载入「${template.name}」，修改后点击“保存排版”。`);
+}
 $('template-list').onclick = e => {
-  const button = e.target.closest('[data-template-edit], [data-template-apply]');
+  const button = e.target.closest('[data-template-edit], [data-template-delete]');
   if (!button) return;
-  $('layout-template').value = button.dataset.templateEdit || button.dataset.templateApply;
-  $('layout-template').onchange();
-  if (button.dataset.templateEdit) $('edit-template').click();
-  else $('apply-template').click();
-};
-$('update-template').onclick = () => {
-  const template = project.templates?.find(t => t.id === editingTemplateId);
-  if (!template || editingClassId !== current().id) return;
-  const settings = Object.fromEntries(Object.keys(defaults).map(key => [key, $(key).type === 'checkbox' ? $(key).checked : $(key).value]));
-  template.settings = cleanSettings({ ...current().settings, ...settings });
-  current().settings = cleanSettings(template.settings); update();
-  toast(storageOK ? `排版模板「${template.name}」修改已保存。` : '模板暂存失败，请点击顶部“保存项目”下载保存。');
+  if (button.dataset.templateEdit) return editTemplate(button.dataset.templateEdit);
+  const template = project.templates?.find(t => t.id === button.dataset.templateDelete);
+  if (!template || !confirm(`删除排版「${template.name}」？`)) return;
+  project.templates = project.templates.filter(t => t.id !== template.id);
+  update(); toast('排版已删除。');
 };
 async function saveTemplate() {
   const cls = current();
-  const settings = cleanSettings({ ...cls.settings, ...Object.fromEntries(Object.keys(defaults).map(key => [key, $(key).type === 'checkbox' ? $(key).checked : $(key).value])) });
+  const values = Object.fromEntries(Object.keys(defaults).map(key => [key, $(key).type === 'checkbox' ? $(key).checked : $(key).value]));
+  // A rounded display must not replace the precise fitted height when saving.
+  if (Number(values.rowHeight) === Number(cls.settings.rowHeight.toFixed(2))) values.rowHeight = cls.settings.rowHeight;
+  const settings = cleanSettings({ ...cls.settings, ...values });
+  const editing = editingClassId === cls.id && project.templates?.find(t => t.id === editingTemplateId);
+  if (editing) {
+    editing.settings = settings;
+    cls.settings = cleanSettings(settings);
+    update();
+    toast(storageOK ? `排版「${editing.name}」修改已保存。` : '排版暂存失败，请点击顶部“保存项目”下载保存。');
+    return;
+  }
   const name = await askText('保存排版模板名称', `${current().name}排版`);
   if (!name) return;
   project.templates ||= [];
@@ -232,27 +240,9 @@ async function saveTemplate() {
   cls.settings = cleanSettings(settings);
   project.templates = [template, ...project.templates.filter(t => t.id !== template.id)];
   editingTemplateId = template.id; editingClassId = cls.id;
-  update(); $('layout-template').value = template.id;
-  $('apply-template').disabled = $('delete-template').disabled = false;
-  renderTemplateEditor();
-  document.querySelector('[data-panel="templates"]').click();
-  $('templates-panel').scrollTop = 0;
+  update();
   toast(storageOK ? `排版模板「${name}」已保存，已显示在模板列表首位。` : '模板暂存失败，请点击顶部“保存项目”下载保存。');
 }
-$('save-template').onclick = () => saveTemplate();
-$('apply-template').onclick = () => {
-  const template = project.templates?.find(t => t.id === $('layout-template').value);
-  if (!template) return;
-  editingTemplateId = template.id; editingClassId = current().id;
-  current().settings = cleanSettings(template.settings); update();
-  toast(`已套用「${template.name}」，并按当前班级人数重新排版。`);
-  document.querySelector('[data-panel="layout"]').click();
-};
-$('delete-template').onclick = () => {
-  const template = project.templates?.find(t => t.id === $('layout-template').value);
-  if (!template || !confirm(`删除排版模板「${template.name}」？`)) return;
-  project.templates = project.templates.filter(t => t.id !== template.id); update(); toast('排版模板已删除。');
-};
 $('scope').onchange = renderPreview; $('zoom').onchange = resizePreview;
 new ResizeObserver(resizePreview).observe($('preview-scroll'));
 $('save-project').onclick = () => { download(JSON.stringify(project, null, 2), `班级花名册-${projectStamp()}.json`, 'application/json'); toast('项目已下载，请保留此文件用于恢复或迁移。'); };

@@ -46,7 +46,7 @@ export function exportWorkbook(project) {
           setHeight(row++, m.heading);
           const length = Math.max(...pair.blocks.map(b => b?.students.length || 0));
           for (let j = 0; j < length; j++) {
-            pair.blocks.forEach((b, ci) => { if (b?.students[j]) member(b.students[j], row, ci * 2, cellColor(s, b.index, j + b.offset)); }); setHeight(row++, m.row);
+            pair.blocks.forEach((b, ci) => { if (b?.students[j]) member(b.students[j], row, ci * 2, cellColor(s, b.index, j + b.offset, b.groupLength)); }); setHeight(row++, m.row);
           }
         });
       }

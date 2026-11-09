@@ -2,6 +2,14 @@ export const defaults = Object.freeze({ title: '', mode: 'gender', groupSize: 5,
 export const palettes = {
   fresh: ['D9EAF5', 'F4DEE7', 'DCEEDC', 'F9E8CD', 'E8E0F3', 'D8EEEA'],
   warm: ['F7DFCD', 'E8DFF3', 'FAECCB', 'DDE9D5', 'D9E8F2', 'F4DCE0'],
+  ocean: ['BEDDF2', 'C8E9F0', 'CCDAF2', 'BFE5E8', 'D7E7F5', 'CADFED'],
+  forest: ['CCE4CC', 'DDE8C5', 'BFE2D5', 'D3E9DB', 'DBE5CE', 'C5DED8'],
+  sunset: ['F5D3BA', 'F3C9C7', 'F6DFBA', 'EBCDD8', 'F4DCCB', 'F0D7B8'],
+  lavender: ['DBCEF0', 'E9D3ED', 'CFD6F0', 'E3DDF4', 'D6CBE6', 'EBDCF0'],
+  sakura: ['F2CDD9', 'F5D9E4', 'EBCDE3', 'F4D5CE', 'E9D8ED', 'F3DFE5'],
+  mint: ['C5E8DE', 'D3EEDB', 'C9E8EA', 'DDEFCF', 'CDE3D8', 'D8EFEB'],
+  earth: ['E4D6BF', 'D5DDC7', 'E9CFBE', 'DAD3C5', 'E8DFC9', 'D0DED4'],
+  rainbow: ['F1CCCC', 'F4DABD', 'EEE6BF', 'CDE5CC', 'C9DEF1', 'DDCEED'],
   gray: ['E3E7EB', 'D5DBE0', 'ECEEF0', 'CDD5DC']
 };
 export const uid = () => globalThis.crypto?.randomUUID?.() || `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -115,7 +123,7 @@ export function planPages(cls) {
     const group = members.slice(i, i + s.groupSize), index = Math.floor(i / s.groupSize);
     for (let offset = 0; offset < group.length; offset += m.groupCapacity) {
       const students = group.slice(offset, offset + m.groupCapacity);
-      blocks.push({ index, continued: offset > 0, students, offset, height: m.heading + students.length * m.row });
+      blocks.push({ index, continued: offset > 0, students, offset, groupLength: group.length, height: m.heading + students.length * m.row });
     }
   }
   const pages = []; let page = { mode: 'group', pairs: [] }, used = 0;
@@ -129,8 +137,22 @@ export function planPages(cls) {
   if (page.pairs.length || !pages.length) pages.push(page);
   return pages;
 }
-export function cellColor(settings, index, offset = 0) {
-  const list = palettes[settings.palette] || palettes.fresh, hex = list[index % list.length];
-  const blend = (offset % 5) * 0.045;
-  return hex.match(/../g).map(v => Math.round(parseInt(v, 16) + (255 - parseInt(v, 16)) * blend).toString(16).padStart(2, '0')).join('').toUpperCase();
+export function cellColor(settings, index, offset = 0, groupLength = settings.groupSize) {
+  const list = palettes[settings.palette] || palettes.fresh;
+  if (settings.mode !== 'group') return list[index % list.length];
+  const [r, g, b] = list[0].match(/../g).map(v => parseInt(v, 16) / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), delta = max - min;
+  const seed = !delta ? 0 : max === r ? ((g - b) / delta + 6) % 6 : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4;
+  // Golden-angle spacing gives each group its own hue without a short palette cycle.
+  // Keep that hue and saturation fixed within the group; only lightness changes.
+  const hue = (seed * 60 + index * 137.507764) % 360;
+  const saturation = settings.palette === 'gray' ? 0 : Math.min(0.65, Math.max(0.35, delta / (1 - Math.abs(max + min - 1))));
+  const progress = groupLength > 1 ? Math.min(1, Math.max(0, offset / (groupLength - 1))) : 0.5;
+  const lightness = settings.palette === 'gray'
+    ? 0.62 + ((index * 0.618033989) % 1) * 0.12 + progress * 0.2
+    : 0.7 + progress * 0.25;
+  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+  const x = chroma * (1 - Math.abs((hue / 60) % 2 - 1)), m = lightness - chroma / 2;
+  const channels = hue < 60 ? [chroma, x, 0] : hue < 120 ? [x, chroma, 0] : hue < 180 ? [0, chroma, x] : hue < 240 ? [0, x, chroma] : hue < 300 ? [x, 0, chroma] : [chroma, 0, x];
+  return channels.map(v => Math.round((v + m) * 255).toString(16).padStart(2, '0')).join('').toUpperCase();
 }

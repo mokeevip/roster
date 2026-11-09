@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import XLSX from 'xlsx-js-style';
 import { unzipSync, strFromU8 } from 'fflate';
-import { newClass, planPages, metrics, parseText, validateProject, layoutSettings } from '../src/model.js';
+import { newClass, planPages, metrics, parseText, validateProject, layoutSettings, palettes, cellColor } from '../src/model.js';
 import { exportWorkbook, importWorkbook } from '../src/excel.js';
 
 function fixture(count = 61) {
@@ -38,6 +38,54 @@ test('项目验证拒绝无效名单，设置归一化', () => {
   const p = fixture(1); p.classes[0].settings.gap = -10;
   assert.equal(validateProject(p).classes[0].settings.gap, 8);
   p.classes[0].students[0].gender = '未知'; assert.throws(() => validateProject(p));
+});
+test('各配色的组内颜色持续变浅，跨页及末组在 Excel 中保持完整递进', () => {
+  for (const palette of Object.keys(palettes)) for (const groupSize of [1, 5, 7, 100]) {
+    const p = fixture(groupSize + 3), c = p.classes[0];
+    Object.assign(c.settings, { mode: 'group', palette, groupSize });
+    const wb = XLSX.read(exportWorkbook(p), { type: 'array', cellStyles: true });
+    assert.equal(importWorkbook(exportWorkbook(p)).project.classes[0].settings.palette, palette);
+    const ws = wb.Sheets[wb.SheetNames[0]], groups = new Map();
+    const colors = new Map(Object.entries(ws).filter(([ref, cell]) => !ref.startsWith('!') && /^\d+\. 学生\d+$/.test(cell.v)).map(([, cell]) => [Number(cell.v.split('.')[0]), cell.s.fgColor.rgb]));
+    for (const page of planPages(c)) for (const pair of page.pairs) for (const b of pair.blocks.filter(Boolean)) {
+      assert.equal(b.groupLength, Math.min(groupSize, c.students.length - b.index * groupSize));
+      if (!groups.has(b.index)) groups.set(b.index, []);
+      groups.get(b.index).push(...b.students.map(student => colors.get(student.number)));
+    }
+    assert.equal(colors.size, c.students.length);
+    for (const list of groups.values()) {
+      assert.ok(list.every(color => /^[A-F0-9]{6}$/.test(color)));
+      for (let i = 1; i < list.length; i++) {
+        const previous = list[i - 1].match(/../g).map(v => parseInt(v, 16));
+        const current = list[i].match(/../g).map(v => parseInt(v, 16));
+        assert.ok(current.every((v, j) => v >= previous[j]));
+        if (list.length <= 7) assert.ok(current.some((v, j) => v > previous[j]), `${palette}: 第${i + 1}项应继续变浅`);
+      }
+      const brightness = color => color.match(/../g).reduce((sum, v) => sum + parseInt(v, 16), 0);
+      if (list.length > 1) assert.ok(brightness(list.at(-1)) - brightness(list[0]) > 100);
+      if (list.length > 5) assert.notEqual(list[5], list[0], '第6项不能重置为首项颜色');
+    }
+  }
+});
+test('同页多组不循环用色，同组保持色相且仅深浅变化', () => {
+  for (const palette of Object.keys(palettes)) {
+    const settings = { mode: 'group', palette, groupSize: 5 };
+    const colors = Array.from({ length: 20 }, (_, index) => cellColor(settings, index));
+    assert.equal(new Set(colors).size, colors.length, palette);
+    if (palette === 'gray') continue;
+    const hue = hex => {
+      const [r, g, b] = hex.match(/../g).map(v => parseInt(v, 16));
+      const max = Math.max(r, g, b), delta = max - Math.min(r, g, b);
+      return (max === r ? ((g - b) / delta + 6) % 6 : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4) * 60;
+    };
+    for (let index = 0; index < 20; index++) {
+      const start = hue(colors[index]);
+      for (let offset = 1; offset < 5; offset++) {
+        const difference = Math.abs(start - hue(cellColor(settings, index, offset)));
+        assert.ok(Math.min(difference, 360 - difference) < 6, '组内色相应保持一致');
+      }
+    }
+  }
 });
 test('排版模板随项目和Excel恢复，旧项目兼容，模板参数独立', () => {
   const p = fixture(52), c = p.classes[0];
