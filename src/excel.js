@@ -1,6 +1,6 @@
 import XLSX from 'xlsx-js-style';
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
-import { layoutSettings, planPages, metrics, cellColor, newClass, uid, gender, validateProject } from './model.js';
+import { layoutSettings, planPages, metrics, cellColor, newClass, uid, gender, validateProject, tableWidths } from './model.js';
 
 const META = '__花名册数据';
 const font = { name: '微软雅黑', sz: 13, color: { rgb: '273D48' } };
@@ -18,40 +18,51 @@ export function exportWorkbook(project) {
   for (const cls of project.classes) {
     const s = layoutSettings(cls), m = metrics(s), pages = planPages(cls);
     const ws = { '!merges': [], '!rows': [], '!cols': [{ wpx: m.columnWidth * 96 / 25.4 }, { wpx: s.gap * 96 / 25.4 }, { wpx: m.columnWidth * 96 / 25.4 }] };
+    const widths = s.tableStyle ? tableWidths(s) : [m.columnWidth];
+    const stride = widths.length + 1, lastColumn = stride + widths.length - 1;
+    ws['!cols'] = [...widths, s.gap, ...widths].map(mm => ({ wpx: mm * 96 / 25.4 }));
     const mapping = []; const pageBreaks = []; let row = 0;
     const put = (r, c, v, style) => { const ref = XLSX.utils.encode_cell({ r, c }); ws[ref] = textCell(v, style); return ref; };
     const setHeight = (r, mm) => { ws['!rows'][r] = { hpt: mm * 72 / 25.4 }; };
+    const heading = (r, c, value, style) => {
+      put(r, c, value, style);
+      if (widths.length > 1) ws['!merges'].push({ s: { r, c }, e: { r, c: c + widths.length - 1 } });
+    };
     const member = (p, r, c, color) => {
-      const prefix = s.showNumbers ? `${p.number}. ` : '';
-      const ref = put(r, c, prefix + p.name, { ...baseStyle, font: { ...font, sz: s.fontSize }, fill: { patternType: 'solid', fgColor: { rgb: color } } });
-      mapping.push({ ref, name: p.name, gender: p.gender, order: p.number, prefix });
+      const prefix = !s.tableStyle && s.showNumbers ? `${p.number}. ` : '';
+      const edge = { style: 'thin', color: { rgb: 'A6B3BB' } };
+      const style = { ...baseStyle, font: { ...font, sz: s.fontSize }, fill: { patternType: 'solid', fgColor: { rgb: color } }, ...(s.tableStyle ? { border: { top: edge, bottom: edge, left: edge, right: edge }, alignment: { vertical: 'center', horizontal: 'left' } } : {}) };
+      if (s.tableStyle && s.showNumbers) put(r, c++, p.number, { ...style, font: { ...font, sz: 9, color: { rgb: '536671' } }, alignment: { vertical: 'center', horizontal: 'center' } });
+      const ref = put(r, c, prefix + p.name, s.tableStyle ? { ...style, alignment: { vertical: 'center', horizontal: 'center' } } : style);
+      if (s.tableStyle) for (let i = 1; i <= s.blankColumns; i++) put(r, c + i, '', style);
+      mapping.push({ ref, name: p.name, gender: p.gender, order: p.originalNumber, prefix });
     };
     for (let pi = 0; pi < pages.length; pi++) {
       if (pi) pageBreaks.push(row);
       put(row, 0, s.title || `${cls.name}花名册`, { font: { ...font, sz: 19, bold: true }, alignment: { horizontal: 'center', vertical: 'center' } });
-      ws['!merges'].push({ s: { r: row, c: 0 }, e: { r: row, c: 2 } }); setHeight(row++, 12);
+      ws['!merges'].push({ s: { r: row, c: 0 }, e: { r: row, c: lastColumn } }); setHeight(row++, 12);
       put(row, 0, `${cls.name} · 共 ${cls.students.length} 人 · 男 ${cls.students.filter(p => p.gender === '男').length} 人 / 女 ${cls.students.filter(p => p.gender === '女').length} 人 · 第 ${pi + 1}/${pages.length} 页`, { font: { ...font, sz: 9, color: { rgb: '7C8C96' } }, alignment: { horizontal: 'center', vertical: 'center' } });
-      ws['!merges'].push({ s: { r: row, c: 0 }, e: { r: row, c: 2 } }); setHeight(row++, 8);
+      ws['!merges'].push({ s: { r: row, c: 0 }, e: { r: row, c: lastColumn } }); setHeight(row++, 8);
       const page = pages[pi];
       if (page.mode === 'gender') {
         const hs = { font: { ...font, sz: 11, bold: true }, alignment: { horizontal: 'center', vertical: 'center' } };
-        put(row, 0, '男生', hs); put(row, 2, '女生', hs); setHeight(row++, m.heading);
+        heading(row, 0, '男生', hs); heading(row, stride, '女生', hs); setHeight(row++, m.heading);
         for (let j = 0; j < Math.max(...page.columns.map(a => a.length)); j++) {
-          page.columns.forEach((list, ci) => { if (list[j]) member(list[j], row, ci * 2, cellColor(s, ci)); }); setHeight(row++, m.row);
+          page.columns.forEach((list, ci) => { if (list[j]) member(list[j], row, ci * stride, cellColor(s, ci, list[j].number - 1, cls.students.filter(p => p.gender === (ci ? '女' : '男')).length)); }); setHeight(row++, m.row);
         }
       } else {
         page.pairs.forEach((pair, pairIndex) => {
           if (pairIndex) setHeight(row++, s.groupGap);
-          pair.blocks.forEach((b, ci) => { if (b) put(row, ci * 2, `第 ${b.index + 1} 组${b.continued ? '（续）' : ''}`, { font: { ...font, sz: 11, bold: true }, alignment: { horizontal: 'center', vertical: 'center' } }); });
+          pair.blocks.forEach((b, ci) => { if (b) heading(row, ci * stride, `第 ${b.index + 1} 组${b.continued ? '（续）' : ''}`, { font: { ...font, sz: 11, bold: true }, alignment: { horizontal: 'center', vertical: 'center' } }); });
           setHeight(row++, m.heading);
           const length = Math.max(...pair.blocks.map(b => b?.students.length || 0));
           for (let j = 0; j < length; j++) {
-            pair.blocks.forEach((b, ci) => { if (b?.students[j]) member(b.students[j], row, ci * 2, cellColor(s, b.index, j + b.offset, b.groupLength)); }); setHeight(row++, m.row);
+            pair.blocks.forEach((b, ci) => { if (b?.students[j]) member(b.students[j], row, ci * stride, cellColor(s, b.index, j + b.offset, b.groupLength)); }); setHeight(row++, m.row);
           }
         });
       }
     }
-    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(0, row - 1), c: 2 } });
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(0, row - 1), c: lastColumn } });
     ws['!margins'] = { left: s.margin / 25.4, right: s.margin / 25.4, top: s.verticalMargin / 25.4, bottom: s.verticalMargin / 25.4, header: 0, footer: 0 };
     const name = sheetName(cls.name, used); XLSX.utils.book_append_sheet(wb, ws, name);
     entries.push({ sheet: name, classId: cls.id, mapping }); breaks.push(pageBreaks);

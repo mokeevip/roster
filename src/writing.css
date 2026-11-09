@@ -1,0 +1,8 @@
+.writing-table{width:100%;outline:0.6pt solid #87979f;outline-offset:-0.6pt;border-radius:1mm;overflow:hidden;break-inside:avoid;color:#293e49}
+.writing-row{display:grid;width:100%;margin:0;padding:0;overflow:hidden;line-height:1.25}
+.writing-row+.writing-row{border-top:0.4pt solid #a6b3bb}
+.writing-cell{display:flex;align-items:center;min-width:0;height:100%;padding:0 0.5mm;overflow:hidden;white-space:nowrap}
+.writing-cell+.writing-cell{border-left:0.4pt solid #a6b3bb}
+.writing-number{justify-content:center;font-size:9pt;font-variant-numeric:tabular-nums;color:#536671;padding:0}
+.writing-name{display:block;align-content:center;text-align:center;padding:0 0.5mm;text-overflow:ellipsis;font-weight:500}
+.writing-name+.writing-blank{border-left-color:#87979f}

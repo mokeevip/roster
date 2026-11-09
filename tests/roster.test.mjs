@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import XLSX from 'xlsx-js-style';
 import { unzipSync, strFromU8 } from 'fflate';
-import { newClass, planPages, metrics, parseText, validateProject, layoutSettings, palettes, cellColor } from '../src/model.js';
+import { newClass, planPages, metrics, parseText, validateProject, layoutSettings, palettes, cellColor, tableWidths } from '../src/model.js';
 import { exportWorkbook, importWorkbook } from '../src/excel.js';
 
 function fixture(count = 61) {
@@ -10,17 +10,69 @@ function fixture(count = 61) {
   c.students = Array.from({ length: count }, (_, i) => ({ id: `p${i}`, name: `学生${i + 1}`, gender: i % 3 ? '男' : '女' }));
   return { format: 'class-roster', version: 1, activeId: c.id, classes: [c] };
 }
+test('无表头填写表格的宽度、分页、模板及 Excel 姓名映射', () => {
+  for (const mode of ['gender', 'group']) for (const showNumbers of [true, false]) for (const blankColumns of [1, 2, 4, 12]) {
+    const p = fixture(83), c = p.classes[0];
+    Object.assign(c.settings, { mode, tableStyle: true, blankColumns, showNumbers, groupSize: 100 });
+    p.templates = [{ id: 'table', name: '填写表格', settings: { ...c.settings } }];
+    const widths = tableWidths(c.settings);
+    assert.equal(widths.length, blankColumns + 1 + Number(showNumbers));
+    assert.ok(Math.abs(widths.reduce((a, b) => a + b) - metrics(c.settings).columnWidth) < 0.001);
+    assert.ok(planPages(c).length > 1);
+    const bytes = exportWorkbook(p), restored = importWorkbook(bytes).project;
+    assert.deepEqual(restored.classes[0].settings, c.settings);
+    assert.deepEqual(restored.templates, p.templates);
+    const styled = XLSX.read(bytes, { type: 'array', cellStyles: true }).Sheets[c.name];
+    const wb = XLSX.read(bytes, { type: 'array' }), ws = wb.Sheets[wb.SheetNames[0]];
+    const nameRef = showNumbers ? 'B4' : 'A4', blankRef = showNumbers ? 'C4' : 'B4';
+    assert.match(ws[nameRef].v, /^学生/);
+    assert.equal(ws[blankRef].v, '');
+    assert.equal(styled[blankRef].s.fgColor.rgb, styled[nameRef].s.fgColor.rgb);
+    assert.deepEqual(restored.classes[0].students.map(s => s.name), c.students.map(s => s.name));
+    assert.equal(ws.A3.v, mode === 'group' ? '第 1 组' : '男生');
+    const xml = strFromU8(unzipSync(bytes)['xl/styles.xml']);
+    assert.match(xml, /style="thin"/);
+    ws[nameRef].v = '表格改名';
+    const result = importWorkbook(XLSX.write(wb, { type: 'array', bookType: 'xlsx' }));
+    assert.equal(result.changes, 1);
+    assert.ok(result.project.classes[0].students.some(p => p.name === '表格改名'));
+  }
+  const p = fixture(1); delete p.classes[0].settings.tableStyle; delete p.classes[0].settings.blankColumns;
+  assert.equal(validateProject(p).classes[0].settings.tableStyle, false);
+  assert.equal(validateProject(p).classes[0].settings.blankColumns, 2);
+});
 test('粘贴解析不丢失无效行，并允许同名', () => {
   const r = parseText('姓名\t性别\r\n小明\t男\n小明 女\n小红 未知');
   assert.equal(r.rows.length, 2); assert.equal(r.errors.length, 1);
 });
-test('男女不均时分页且保持原始编号，左右尺寸对称', () => {
+test('男女列同色系由深到浅，跨页连续且 Excel 与预览颜色一致', () => {
+  const p = fixture(111), c = p.classes[0];
+  for (const palette of Object.keys(palettes)) {
+    c.settings.palette = palette;
+    const ws = XLSX.read(exportWorkbook(p), { type: 'array', cellStyles: true }).Sheets[c.name];
+    const actual = new Map(Object.entries(ws).filter(([ref, cell]) => !ref.startsWith('!') && /^\d+\. 学生\d+$/.test(cell.v)).map(([, cell]) => [cell.v.split('. ')[1], cell.s.fgColor.rgb]));
+    for (const [ci, gender] of [[0, '男'], [1, '女']]) {
+      const students = c.students.filter(p => p.gender === gender);
+      const colors = students.map((p, i) => {
+        const color = cellColor(c.settings, ci, i, students.length);
+        assert.equal(actual.get(p.name), color);
+        return color.match(/../g).map(v => parseInt(v, 16));
+      });
+      for (let i = 1; i < colors.length; i++) assert.ok(colors[i].every((v, j) => v >= colors[i - 1][j]));
+      assert.notDeepEqual(colors[0], colors.at(-1));
+    }
+  }
+});
+test('男女不均时分页且分别连续编号，原始顺序独立保存，左右尺寸对称', () => {
   const p = fixture(111), c = p.classes[0]; c.settings.autoFit = false;
   const pages = planPages(c), m = metrics(c.settings);
   assert.ok(pages.length > 1);
   assert.equal(m.columnWidth * 2 + c.settings.gap + c.settings.margin * 2, 210);
   for (const [ci, g] of [[0, '男'], [1, '女']]) {
     assert.deepEqual(pages.flatMap(page => page.columns[ci]).map(s => s.name), c.students.filter(s => s.gender === g).map(s => s.name));
+    const students = pages.flatMap(page => page.columns[ci]);
+    assert.deepEqual(students.map(s => s.number), students.map((_, i) => i + 1));
+    assert.deepEqual(students.map(s => c.students[s.originalNumber - 1].name), students.map(s => s.name));
     assert.ok(pages.every(page => page.columns[ci].length <= m.genderCapacity));
   }
 });

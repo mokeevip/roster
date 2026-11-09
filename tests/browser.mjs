@@ -95,6 +95,31 @@ try {
     return [...p.querySelectorAll('.student-cell')].some(c => c.getBoundingClientRect().bottom > footer.top);
   }));
   assert.equal(overflow, false);
+  await page.locator('#tableStyle').check();
+  for (const mode of ['gender', 'group']) for (const numbers of [true, false]) {
+    await page.locator('#mode').selectOption(mode);
+    await page.locator('#showNumbers').setChecked(numbers);
+    await page.locator('#blankColumns').fill('12'); await page.locator('#blankColumns').blur();
+    assert.equal(await page.locator('.writing-row').count(), 63);
+    assert.equal(await page.locator('.writing-blank').count(), 63 * 12);
+    assert.equal(await page.locator('.writing-number').count(), numbers ? 63 : 0);
+    const valid = await page.locator('.paper').evaluateAll(papers => papers.every(p => {
+      const footer = p.querySelector('.paper-footer').getBoundingClientRect();
+      return [...p.querySelectorAll('.writing-table')].every(table => {
+        const rect = table.getBoundingClientRect(), rows = [...table.querySelectorAll('.writing-row')];
+        return rect.bottom <= footer.top + 1 && rows.every((row, i) => {
+          const cells = [...row.children], r = row.getBoundingClientRect();
+          return cells.every(cell => getComputedStyle(cell).backgroundColor === getComputedStyle(cells[0]).backgroundColor) &&
+            Math.abs(cells.at(-1).getBoundingClientRect().right - r.right) < 1 &&
+            (!i || Math.abs(rows[i - 1].getBoundingClientRect().bottom - r.top) < 0.1);
+        });
+      });
+    }));
+    assert.equal(valid, true);
+  }
+  await page.locator('#tableStyle').uncheck();
+  await page.locator('#showNumbers').check();
+  await page.locator('#mode').selectOption('group');
   const groupColors = await page.locator('.student-cell').evaluateAll(cells => cells.map(cell => getComputedStyle(cell).backgroundColor.match(/\d+/g).map(Number)));
   for (let i = 1; i < groupColors.length; i++) {
     assert.ok(groupColors[i].every((value, channel) => value >= groupColors[i - 1][channel]));

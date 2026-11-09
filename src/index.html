@@ -38,6 +38,8 @@
         <label class="field">花名册标题<input id="title" type="text" maxlength="100" placeholder="留空时使用班级名称"></label>
         <label class="field">排版模式<select id="mode"><option value="gender">男女双列 · 男左女右</option><option value="group">分组双列 · 保持原序</option></select></label>
         <input id="autoFit" type="checkbox" hidden>
+        <label class="check-label"><input id="tableStyle" type="checkbox">启用表格填写样式</label>
+        <label class="field">空白填写列数（1～12）<input id="blankColumns" type="number" min="1" max="12" step="1"></label>
         <button id="fit-one-page" class="soft-button">一键适配 A4</button>
         <p id="fit-status" class="layout-note" aria-live="polite"></p>
         <div class="field-grid"><label class="field">每组人数<input id="groupSize" type="number" min="1" max="100" step="1"></label><label class="field">配色方案<select id="palette"><option value="fresh">清新柔和</option><option value="warm">温暖明亮</option><option value="ocean">海洋蓝</option><option value="forest">森林绿</option><option value="sunset">落日橙</option><option value="lavender">薰衣草紫</option><option value="sakura">樱花粉</option><option value="mint">薄荷青</option><option value="earth">自然大地</option><option value="rainbow">缤纷彩虹</option><option value="gray">灰阶省墨</option></select></label></div>
@@ -45,7 +47,7 @@
         <div class="field-grid"><label class="field">左右页边距（mm）<input id="margin" type="number" min="8" max="30" step="1"></label><label class="field">中间留白（mm）<input id="gap" type="number" min="8" max="35" step="1"></label></div>
         <div class="field-grid"><label class="field">上下页边距（mm）<input id="verticalMargin" type="number" min="8" max="25" step="1"></label><label class="field">组间距（mm）<input id="groupGap" type="number" min="2" max="12" step="1"></label></div>
         <p class="hint">分组配色：各组使用不同色相，组内保持同色系、由深到浅递进；灰阶方案以不同灰度区分组。修改组人数或组间距会切换为分组排版。一键适配后仍可自由修改全部参数。</p>
-        <label class="check-label"><input id="showNumbers" type="checkbox">显示原始名单序号</label>
+        <label class="check-label"><input id="showNumbers" type="checkbox">显示序号（男女分别编号，分组按原始名单）</label>
         <div class="layout-note"><strong>对称布局</strong><p id="geometry"></p><p>左右等宽、内部边距一致；中间始终保持纯白。人数不同也不会挤占留白。</p></div>
         <div class="paste-actions"><button id="save-layout" class="primary">保存排版</button><button id="reset-layout">恢复默认排版</button></div>
         <p id="template-edit-status" aria-live="polite"></p>

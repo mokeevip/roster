@@ -1,4 +1,4 @@
-export const defaults = Object.freeze({ title: '', mode: 'gender', groupSize: 5, palette: 'fresh', fontSize: 13, rowHeight: 9, margin: 15, gap: 15, verticalMargin: 15, groupGap: 5, showNumbers: true, autoFit: false });
+export const defaults = Object.freeze({ title: '', mode: 'gender', groupSize: 5, palette: 'fresh', fontSize: 13, rowHeight: 9, margin: 15, gap: 15, verticalMargin: 15, groupGap: 5, showNumbers: true, autoFit: false, tableStyle: false, blankColumns: 2 });
 export const palettes = {
   fresh: ['D9EAF5', 'F4DEE7', 'DCEEDC', 'F9E8CD', 'E8E0F3', 'D8EEEA'],
   warm: ['F7DFCD', 'E8DFF3', 'FAECCB', 'DDE9D5', 'D9E8F2', 'F4DCE0'],
@@ -31,6 +31,9 @@ export function cleanSettings(s = {}) {
     result[key] = Number.isFinite(n) ? Math.min(max, Math.max(min, integer ? Math.round(n) : n)) : defaults[key];
   }
   result.showNumbers = s.showNumbers !== false;
+  result.tableStyle = s.tableStyle === true;
+  const columns = Number(s.blankColumns ?? defaults.blankColumns);
+  result.blankColumns = Number.isFinite(columns) ? Math.max(1, Math.min(12, Math.round(columns))) : defaults.blankColumns;
   result.autoFit = s.autoFit === true;
   for (const [key, min, max] of [['layoutRow', 4, 19], ['layoutHeading', 4, 10]]) {
     if (Number.isFinite(s[key])) result[key] = Math.min(max, Math.max(min, s[key]));
@@ -83,6 +86,12 @@ export function metrics(settings) {
   const body = 297 - s.verticalMargin * 2 - 20;
   return { row, heading, body, genderCapacity: Math.max(1, Math.floor((body - heading) / row)), groupCapacity: Math.max(1, Math.floor((body - heading) / row)), columnWidth: (210 - 2 * s.margin - s.gap) / 2 };
 }
+// Physical widths shared by preview and Excel; there is deliberately no header row.
+export function tableWidths(settings) {
+  const s = cleanSettings(settings), width = metrics(s).columnWidth;
+  const number = s.showNumbers ? 8 : 0, name = Math.max(22, width * 0.3);
+  return [...(s.showNumbers ? [number] : []), name, ...Array(s.blankColumns).fill((width - number - name) / s.blankColumns)];
+}
 // Transient dimensions: never overwrite the user's saved manual settings.
 export function layoutSettings(cls) {
   const s = cleanSettings(cls.settings), original = metrics(s);
@@ -111,9 +120,10 @@ export function layoutSettings(cls) {
 }
 export function planPages(cls) {
   const s = layoutSettings(cls), m = metrics(s);
-  const members = cls.students.map((p, i) => ({ ...p, number: i + 1 }));
+  const members = cls.students.map((p, i) => ({ ...p, number: i + 1, originalNumber: i + 1 }));
   if (s.mode === 'gender') {
-    const male = members.filter(p => p.gender === '男'), female = members.filter(p => p.gender === '女');
+    const numbered = g => members.filter(p => p.gender === g).map((p, i) => ({ ...p, number: i + 1 }));
+    const male = numbered('男'), female = numbered('女');
     const total = Math.max(1, Math.ceil(Math.max(male.length, female.length) / m.genderCapacity));
     return Array.from({ length: total }, (_, i) => ({ columns: [male.slice(i * m.genderCapacity, (i + 1) * m.genderCapacity), female.slice(i * m.genderCapacity, (i + 1) * m.genderCapacity)], mode: 'gender' }));
   }
@@ -139,13 +149,13 @@ export function planPages(cls) {
 }
 export function cellColor(settings, index, offset = 0, groupLength = settings.groupSize) {
   const list = palettes[settings.palette] || palettes.fresh;
-  if (settings.mode !== 'group') return list[index % list.length];
-  const [r, g, b] = list[0].match(/../g).map(v => parseInt(v, 16) / 255);
+  const base = settings.mode === 'group' ? list[0] : list[index % list.length];
+  const [r, g, b] = base.match(/../g).map(v => parseInt(v, 16) / 255);
   const max = Math.max(r, g, b), min = Math.min(r, g, b), delta = max - min;
   const seed = !delta ? 0 : max === r ? ((g - b) / delta + 6) % 6 : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4;
   // Golden-angle spacing gives each group its own hue without a short palette cycle.
   // Keep that hue and saturation fixed within the group; only lightness changes.
-  const hue = (seed * 60 + index * 137.507764) % 360;
+  const hue = (seed * 60 + (settings.mode === 'group' ? index * 137.507764 : 0)) % 360;
   const saturation = settings.palette === 'gray' ? 0 : Math.min(0.65, Math.max(0.35, delta / (1 - Math.abs(max + min - 1))));
   const progress = groupLength > 1 ? Math.min(1, Math.max(0, offset / (groupLength - 1))) : 0.5;
   const lightness = settings.palette === 'gray'

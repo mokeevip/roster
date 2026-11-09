@@ -1,4 +1,4 @@
-import { defaults, uid, newClass, newProject, validateProject, cleanSettings, parseText, duplicateNames, planPages, metrics, cellColor, layoutSettings } from './model.js';
+import { defaults, uid, newClass, newProject, validateProject, cleanSettings, parseText, duplicateNames, planPages, metrics, cellColor, layoutSettings, tableWidths } from './model.js';
 import { exportWorkbook, importWorkbook } from './excel.js';
 
 const $ = id => document.getElementById(id);
@@ -54,6 +54,7 @@ function renderSettings() {
   Object.keys(defaults).forEach(key => { if ($(key).type === 'checkbox') $(key).checked = s[key]; else $(key).value = key === 'rowHeight' ? Number(s[key].toFixed(2)) : s[key]; });
   $('groupSize').disabled = false;
   $('groupGap').disabled = false;
+  $('blankColumns').disabled = !s.tableStyle;
   $('template-list').innerHTML = (project.templates || []).length ? project.templates.map(t => `<div class="layout-note template-card"><button class="template-open" data-template-edit="${escape(t.id)}"><strong>${escape(t.name)}</strong><span>${t.settings.mode === 'group' ? `分组双列 · 每组 ${t.settings.groupSize} 人` : '男女双列 · 男左女右'} · ${t.settings.fontSize} pt</span></button><div class="paste-actions"><button class="primary" data-template-edit="${escape(t.id)}">编辑</button><button class="danger-text" data-template-delete="${escape(t.id)}">删除</button></div></div>`).join('') : '<div class="hint">还没有保存的排版。点击“新建排版”，设置完成后点击“保存排版”。</div>';
   renderTemplateEditor();
   const fitted = layoutSettings(current()), pages = planPages(current());
@@ -62,7 +63,17 @@ function renderSettings() {
 }
 function selectedClasses() { return $('scope').value === 'all' ? project.classes : [current()]; }
 function cell(p, s, index, offset = 0, groupLength = s.groupSize) {
+  if (s.mode === 'gender') offset = p.number - 1;
   return `<div class="student-cell" style="height:${metrics(s).row - 0.6}mm;font-size:${s.fontSize}pt;background:#${cellColor(s, index, offset, groupLength)}">${s.showNumbers ? `<span class="number">${p.number}.</span>` : ''}<span class="student-name">${escape(p.name)}</span></div>`;
+}
+function members(list, s, index, offset = 0, groupLength = s.groupSize) {
+  if (!s.tableStyle) return list.map((p, j) => cell(p, s, index, offset + j, groupLength)).join('');
+  if (!list.length) return '';
+  const widths = tableWidths(s).map(w => `${w}mm`).join(' ');
+  return `<div class="writing-table" role="table" aria-label="手写填写表格">${list.map((p, j) => {
+    const background = `background:#${cellColor(s, index, s.mode === 'gender' ? p.number - 1 : offset + j, groupLength)}`;
+    return `<div class="writing-row" role="row" style="height:${metrics(s).row}mm;font-size:${s.fontSize}pt;grid-template-columns:${widths}">${s.showNumbers ? `<div class="writing-cell writing-number" role="cell" style="${background}">${p.number}</div>` : ''}<div class="writing-cell writing-name" role="cell" style="${background}" title="${escape(p.name)}">${escape(p.name)}</div>${Array.from({ length: s.blankColumns }, () => `<div class="writing-cell writing-blank" role="cell" style="${background}"></div>`).join('')}</div>`;
+  }).join('')}</div>`;
 }
 function renderPreview() {
   let count = 0;
@@ -72,8 +83,8 @@ function renderPreview() {
     return pages.map((page, pi) => {
       let content = '';
       if (!cls.students.length) content = '<div class="paper-empty">添加学生后，这里将显示花名册</div>';
-      else if (page.mode === 'gender') content = page.columns.map((list, ci) => `<div class="paper-column"><div class="column-heading" style="height:${metrics(s).heading}mm;margin-bottom:0">${ci ? '女生' : '男生'}</div>${list.map(p => cell(p, s, ci)).join('')}</div>`).join('');
-      else content = page.pairs.map(pair => pair.blocks.map(b => `<div class="group-block" style="height:${pair.height}mm">${b ? `<div class="group-heading" style="height:${metrics(s).heading}mm">第 ${b.index + 1} 组${b.continued ? '（续）' : ''}</div>${b.students.map((p, j) => cell(p, s, b.index, b.offset + j, b.groupLength)).join('')}` : ''}</div>`).join('')).join('');
+      else if (page.mode === 'gender') content = page.columns.map((list, ci) => `<div class="paper-column"><div class="column-heading" style="height:${metrics(s).heading}mm;margin-bottom:0">${ci ? '女生' : '男生'}</div>${members(list, s, ci, 0, ci ? cls.students.length - male : male)}</div>`).join('');
+      else content = page.pairs.map(pair => pair.blocks.map(b => `<div class="group-block" style="height:${pair.height}mm">${b ? `<div class="group-heading" style="height:${metrics(s).heading}mm">第 ${b.index + 1} 组${b.continued ? '（续）' : ''}</div>${members(b.students, s, b.index, b.offset, b.groupLength)}` : ''}</div>`).join('')).join('');
       return `<div class="page-wrapper"><article class="paper" style="padding:${s.verticalMargin}mm ${s.margin}mm"><div class="paper-title" title="${escape(s.title || cls.name + '花名册')}">${escape(s.title || cls.name + '花名册')}</div><div class="paper-subtitle">${escape(cls.name)} · 共 ${cls.students.length} 人 · 男 ${male} 人 / 女 ${cls.students.length - male} 人${s.mode === 'group' ? ` · 每组 ${s.groupSize} 人` : ''}</div><div class="paper-grid" style="column-gap:${s.gap}mm;row-gap:${s.mode === 'group' ? s.groupGap : 0}mm">${content}</div><div class="paper-footer">${escape(cls.name)} · 第 ${pi + 1} / ${pages.length} 页</div></article></div>`;
     }).join('');
   }).join('');
