@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>班级花名册 · 离线工作台</title>
+  <style>/* INLINE_STYLE */</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-icon">册</span><div><h1>班级花名册</h1><span>CLASS ROSTER · 离线工作台</span></div></div>
+    <div class="toolbar"><span id="save-status" class="status" aria-live="polite">本地暂存就绪</span><button id="fullscreen" class="soft-button" title="隐藏浏览器标签栏和地址栏，Esc 退出">全屏使用</button><button id="open-project">打开项目</button><button id="save-project">保存项目</button><button id="import-excel">导入 Excel</button><button id="export-excel">导出 Excel</button><button id="print" class="primary">打印 / PDF</button></div>
+  </header>
+  <main class="workspace">
+    <aside class="sidebar">
+      <div class="section-heading"><span>我的班级</span><button id="add-class" class="icon-button" title="新建班级" aria-label="新建班级">＋</button></div>
+      <nav id="class-tabs" aria-label="班级列表"></nav>
+      <div class="class-actions"><button id="rename-class">重命名</button><button id="delete-class" class="danger-text">删除班级</button></div>
+      <div class="sidebar-note"><strong>一份名单，多种排版</strong><p>每个班级独立保存设置。名单与排版都可以随项目带走。</p><span>● 纯本地运行 · 无需联网</span></div>
+    </aside>
+    <section class="editor">
+      <div class="editor-heading"><div><span class="eyebrow">CLASS MEMBERS</span><h2 id="class-name"></h2></div><span id="student-count" class="count-badge"></span></div>
+      <div class="tab-bar"><button class="active" data-panel="members">人员名单</button><button data-panel="layout">排版设置</button><button data-panel="templates">模板列表</button></div>
+      <div id="members-panel" class="panel">
+        <div class="hint">从 Excel 复制「姓名、性别」两列，在下方粘贴。性别支持：男 / 女、男生 / 女生、M / F。</div>
+        <textarea id="paste-input" rows="4" placeholder="姓名　性别&#10;张明　男&#10;李芳　女" aria-label="批量录入名单"></textarea>
+        <div class="paste-actions"><label class="check-label"><input type="checkbox" id="replace-list">替换当前名单</label><button id="paste-import" class="soft-button">预览导入</button></div>
+        <div class="list-heading"><strong>学生名单</strong><span>按原始顺序排列，可用箭头调整</span></div>
+        <div class="member-table-wrap"><table class="member-table"><thead><tr><th>序号</th><th>姓名</th><th>性别</th><th>操作</th></tr></thead><tbody id="member-rows"></tbody></table><div id="empty-list" class="empty">还没有学生<br><small>粘贴名单，或点击下方添加</small></div></div>
+        <button id="add-student" class="add-student">＋ 添加学生</button>
+      </div>
+      <div id="layout-panel" class="panel" hidden>
+        <label class="field">花名册标题<input id="title" type="text" maxlength="100" placeholder="留空时使用班级名称"></label>
+        <label class="field">排版模式<select id="mode"><option value="gender">男女双列 · 男左女右</option><option value="group">分组双列 · 保持原序</option></select></label>
+        <input id="autoFit" type="checkbox" hidden>
+        <button id="fit-one-page" class="soft-button">一键适配 A4</button>
+        <p id="fit-status" class="layout-note" aria-live="polite"></p>
+        <div class="field-grid"><label class="field">每组人数<input id="groupSize" type="number" min="1" max="100" step="1"></label><label class="field">配色方案<select id="palette"><option value="fresh">清新柔和</option><option value="warm">温暖明亮</option><option value="gray">灰阶省墨</option></select></label></div>
+        <div class="field-grid"><label class="field">字号（pt）<input id="fontSize" type="number" min="9" max="24" step="1"></label><label class="field">姓名行高（mm）<input id="rowHeight" type="number" min="3.4" max="18" step="any"></label></div>
+        <div class="field-grid"><label class="field">左右页边距（mm）<input id="margin" type="number" min="8" max="30" step="1"></label><label class="field">中间留白（mm）<input id="gap" type="number" min="8" max="35" step="1"></label></div>
+        <div class="field-grid"><label class="field">上下页边距（mm）<input id="verticalMargin" type="number" min="8" max="25" step="1"></label><label class="field">组间距（mm）<input id="groupGap" type="number" min="2" max="12" step="1"></label></div>
+        <p class="hint">修改组人数或组间距会切换为分组排版。一键适配后仍可自由修改全部参数。</p>
+        <label class="check-label"><input id="showNumbers" type="checkbox">显示原始名单序号</label>
+        <div class="layout-note"><strong>对称布局</strong><p id="geometry"></p><p>左右等宽、内部边距一致；中间始终保持纯白。人数不同也不会挤占留白。</p></div>
+        <div class="paste-actions"><button id="save-layout" class="primary">保存排版</button><button id="reset-layout">恢复默认排版</button></div>
+        <div class="paste-actions"><button id="update-template" class="primary" disabled>保存模板修改</button></div>
+        <p id="template-edit-status" aria-live="polite">在“模板列表”中选择已保存的模板，点击“编辑模板”即可重新载入并修改。</p>
+      </div>
+      <div id="templates-panel" class="panel" hidden>
+        <div class="list-heading"><strong>已保存的排版模板</strong><span>点击编辑可修改原模板</span></div>
+        <div id="template-list"></div>
+        <div class="layout-note"><strong>排版模板</strong><p>保存当前排版，供其他班级套用。模板包含标题、自动适配开关及全部手动参数，不包含学生名单。</p>
+          <label class="field">已保存模板<select id="layout-template"><option value="">请选择模板</option></select></label>
+          <div class="paste-actions"><button id="save-template">保存为模板</button><button id="apply-template">套用</button><button id="delete-template">删除</button></div>
+          <div class="paste-actions"><button id="edit-template">编辑模板</button></div>
+        </div>
+      </div>
+    </section>
+    <section class="preview-area">
+      <div class="preview-toolbar"><div><span class="preview-dot"></span><strong>A4 打印预览</strong><span id="page-count"></span></div><div class="preview-options"><label>范围 <select id="scope"><option value="current">当前班级</option><option value="all">全部班级</option></select></label><label>缩放 <select id="zoom"><option value="fit">适应宽度</option><option value="0.6">60%</option><option value="0.8">80%</option><option value="1">100%</option></select></label></div></div>
+      <div class="print-tip">打印请选择 A4、100% 比例，关闭页眉页脚并开启「背景图形」；选择“另存为 PDF”即可导出。</div>
+      <div id="preview-scroll"><div id="preview-pages"></div></div>
+    </section>
+  </main>
+  <dialog id="import-dialog"><div class="dialog-heading"><h2 id="import-title">导入预览</h2><button id="close-import" aria-label="关闭">×</button></div><div id="import-summary"></div><div id="import-details"></div><div class="dialog-footer"><button id="cancel-import">取消</button><button id="confirm-import" class="primary">确认导入</button></div></dialog>
+  <dialog id="text-dialog"><form method="dialog"><h2 id="text-dialog-title"></h2><label class="field" style="margin-top:20px"><input id="text-dialog-input" maxlength="80" required></label><div class="dialog-footer"><button value="cancel" formnovalidate>取消</button><button value="ok" class="primary">确定</button></div></form></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <input type="file" id="project-file" accept=".json,application/json" hidden>
+  <input type="file" id="excel-file" accept=".xlsx" hidden>
+  <script>/* INLINE_SCRIPT */</script>
+</body>
+</html>

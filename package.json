@@ -1,0 +1,50 @@
+{
+  "name": "class-roster",
+  "version": "1.0.0",
+  "private": true,
+  "description": "离线班级花名册与 A4 打印工具",
+  "author": "Class Roster",
+  "main": "desktop/main.cjs",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:browser": "node tests/browser.mjs",
+    "start": "npm run build && electron .",
+    "pack:web": "npm run build && node scripts/pack-web.mjs",
+    "pack:exe": "npm run build && electron-builder --win portable --x64",
+    "pack:all": "npm run pack:web && npm run pack:exe",
+    "test:desktop": "node tests/desktop.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "electron": "39.2.7",
+    "electron-builder": "26.0.12",
+    "esbuild": "0.25.12",
+    "fflate": "^0.8.2",
+    "xlsx-js-style": "1.2.0"
+  },
+  "build": {
+    "appId": "local.classroster.desktop",
+    "productName": "班级花名册",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "desktop/**/*",
+      "班级花名册.html",
+      "package.json"
+    ],
+    "asar": true,
+    "electronDist": "node_modules/electron/dist",
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "班级花名册.exe"
+    }
+  }
+}

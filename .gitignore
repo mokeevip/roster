@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+release/
+/班级花名册.html
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
