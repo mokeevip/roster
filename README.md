@@ -59,6 +59,14 @@ Excel 的字体度量和分页与浏览器存在差异；需要固定打印效�
 
 桌面版打包使用 Windows 10/11 x64，推荐 Node.js 22 LTS（CI 使用此版本）。首次安装与打包需联网下载构建依赖，交付给使用者后可以离线运行。
 
+Windows 下可在 Git Bash 中运行根目录打包脚本，一次生成两种发行包；缺少 `node_modules` 时会自动执行 `npm ci`，任一步骤失败即停止：
+
+```sh
+sh pack.sh
+```
+
+也可手动执行：
+
 ```powershell
 npm ci
 npm run pack:web
@@ -122,6 +130,7 @@ scripts/              网页版打包脚本
 tests/                单元测试、浏览器与桌面验证
 .github/              GitHub CI 与问题反馈模板
 build.mjs             单文件 HTML 构建脚本
+pack.sh               一键打包网页版与 Windows 桌面版
 release/              发行包与桌面构建中间产物（构建生成）
 班级花名册.html         离线网页（构建生成）
 ```

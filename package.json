@@ -1,6 +1,6 @@
 {
   "name": "class-roster",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "离线班级花名册与 A4 打印工具",
   "author": "Class Roster",
